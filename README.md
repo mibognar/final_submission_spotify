@@ -1,0 +1,7 @@
+## Hypothesis
+
+There is a popular assumption that the key of certain melodies (major or minor) define the happiness of these melodies. In this dataset there is a numerical value called __valence__ which determines the valence of each songs. I am going to test if keys ( __mode__ ) predict the overall valence of songs on this dataset. I am also planning to include a more complex model with two other predicting variables  __tempo__ and __energy__, as I *assume* that these variables also play a role in defining a song's overall valence.
+
+## About the dataset
+
+The dataset is a collection of spotify songs recieved with the spotify API. The detailed values of - seemingly - subjective variables got my attention about the data collection method. It is not a surprise that the present data is a product of a proprietary algorithm developed by [The Echo Nest company](https://en.wikipedia.org/wiki/The_Echo_Nest) which provided digital signal processing services and released data on 1 million songs for research purposes. There is not much information about the method of estimating these variables but we can assume that a machine learning algorithm was trained on subjective data, and this algorithm is responsible for these ratings.  The Echo Nest however was aquired by Spotify in 2014 and their algorithm and data was merged into spotify's product personalization service. Capitalism vs. music psychology: 1-0. But hey, we got this fancy dataset to analyze...
