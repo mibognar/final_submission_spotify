@@ -1,0 +1,235 @@
+---
+title: "Final Submission"
+subtitle: "Spotify songs database"
+author: "Miklos Bognar"
+date: '2021-01-16'
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE} 
+knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
+```
+
+# Spotify songs data analysis
+
+## Preparations
+
+### Loading packages
+
+```{r}
+library(tidyverse)
+library(tidytuesdayR)
+library(ggpubr)
+library(olsrr)
+library(car)
+library(jtools)
+theme_set(theme_light())
+```
+
+### Loading data
+```{r}
+source_data = tt_load("2020-01-21")$spotify_songs
+```
+
+## Hypothesis
+
+There is a popular assumption that the key of certain melodies (major or minor) define the happiness of these melodies. In this dataset there is a numerical value called __valence__ which determines the valence of each songs. I am going to test if keys ( __mode__ ) predict the overall valence of songs on this dataset. I am also planning to include a more complex model with two other predicting variables  __tempo__ and __energy__, as I *assume* that these variables also play a role in defining a song's overall valence.
+
+## About the dataset
+
+The dataset is a collection of spotify songs recieved with the spotify API. The detailed values of - seemingly - subjective variables got my attention about the data collection method. It is not a surprise that the present data is a product of a proprietary algorithm developed by [The Echo Nest company](https://en.wikipedia.org/wiki/The_Echo_Nest) which provided digital signal processing services and released data on 1 million songs for research purposes. There is not much information about the method of estimating these variables but we can assume that a machine learning algorithm was trained on subjective data, and this algorithm is responsible for these ratings.  The Echo Nest however was aquired by Spotify in 2014 and their algorithm and data was merged into spotify's product personalization service. Capitalism vs. music psychology: 1-0. But hey, we got this fancy dataset to analyze...
+
+
+## Data wrangling
+
+I recode mode as "major" and "minor" to make sure it is handled as a categorical variable
+
+```{r}
+source_data <- source_data %>% 
+  mutate(mode = case_when(
+    mode == 1 ~ "major",
+    TRUE ~ "minor"
+  ))
+```
+
+
+## Exploring the data
+
+Descriptive data of valence grouped by mode
+
+```{r}
+desc_table <- source_data %>% 
+  group_by(mode) %>% 
+  summarize(mean(valence), median(valence), sd(valence))
+
+desc_table
+
+#Oh, this doesn't look too good...
+```
+
+Checking distribution of predicted and predicting variables
+
+```{r}
+# VALENCE
+source_data %>% ggplot(aes(valence)) + geom_histogram(binwidth = 0.01)
+```
+
+
+```{r}
+# TEMPO
+source_data %>% ggplot(aes(tempo)) + geom_histogram(binwidth = 3)
+```
+
+
+```{r}
+# ENERGY
+source_data %>% ggplot(aes(energy)) + geom_histogram(binwidth = 0.001)
+```
+
+
+```{r}
+# MODE
+source_data %>% ggplot(aes(mode)) + geom_bar()
+```
+
+## Creating complex model
+
+```{r}
+complex_model = lm(valence ~mode + energy + tempo, data = source_data)
+summary(complex_model)
+
+```
+## Checking for influential outliers and assumptions
+
+```{r}
+
+plot(complex_model, 4)
+
+cook <- cooks.distance(complex_model)
+samplesize <- nrow(source_data)
+plot(cook, cex=2) + abline(h=4/samplesize, col="red")
+outliers = as.numeric(names(cook)[(cook>(4/samplesize))])
+
+cleaned_data = source_data[-outliers,]
+
+```
+
+I created a cleaned_data dataframe without the influential outliers
+
+### Normality
+
+```{r}
+plot(complex_model,2)
+ols_plot_resid_hist(complex_model)
+```
+
+### Linearity
+
+```{r}
+#linearity
+plot(complex_model,1)
+```
+
+### Homogenity of variance
+
+```{r}
+#homogenity of variance
+plot(complex_model,3)
+```
+
+### Multicollinearity
+
+```{r}
+#multicollinearity
+vif(complex_model)
+```
+
+Both normality, linearity, and homoscedasticty assumptions are met. There in non sign of multicollinearity.  
+
+
+## Creating the updated complex model on the cleaned data
+
+```{r}
+updated_complex_model <- lm(valence ~ mode + energy + tempo, data = cleaned_data)
+summary(updated_complex_model)
+```
+
+### Checking Normality
+
+```{r}
+plot(updated_complex_model, 2)
+ols_plot_resid_hist(updated_complex_model)
+```
+
+
+### Linearity
+
+```{r}
+#linearity
+
+plot(updated_complex_model,1)
+```
+
+
+### Homogenity of variance
+
+```{r}
+#homogenity of variance
+
+plot(updated_complex_model,3)
+```
+
+### Milticollinearity
+
+```{r}
+#multicollinearity
+
+vif(updated_complex_model)
+```
+
+No changes needed after the updated model
+
+
+
+## Creating the simple model 
+```{r}
+simple_model <- lm(valence ~ mode, data = cleaned_data)
+summary(simple_model)
+```
+
+## Summaries of the two regression model results:
+
+#### Simple model
+
+```{r}
+summ(simple_model)
+```
+
+#### Complex mode
+
+```{r}
+summ(updated_complex_model)
+```
+
+## Comparing the two models
+
+
+```{r}
+anova(simple_model, updated_complex_model)
+```
+
+## Results
+
+The simple linear model I bulit with the single __mode__ predictor has shown no predicting strength regarding __valence__. (F(1,31735) = 0.777, Adjusted R-squared <0.001, *p* = 0.3778).
+The more complex linear model where I included __energy__ and __tempo__ in the equation along with __mode__ performed significantly better (*p*<0.001), but this model explains only the 3% of variability in song __valence__. (F(3,31733) = 372.67, Adjusted R-squared = 0.03, *p* < 0.001)
+
+## Discussion
+
+The popular assumption of the keys defining the happiness of music doesn't replicate on this data. This is pretty surprising considering that the songs represented in the dataset are mostly popular tracks (a bunch of Guns 'n' Roses, but no Dimmu Borgir explains it all...). Maybe it is also a misconseption that pop music is shallow and all the same when they try to provoke emotions.
+Adding more acustical variables to the model improved the explained variability, but only by 3% which doesn't seem a very good model either.
+The variable that I suspect as a major moderator of valence is the lyrics of the song, but it is not included in the data.
+
+
+
